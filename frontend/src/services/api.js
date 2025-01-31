@@ -29,4 +29,4 @@ export const registerUser = (data) =>
 
 // Login işlemi
 export const loginUser = (data) => API.post('/login', data); // Login işlemi
-export const getRolePermissions = () => API.get('/role-permissions');
+export const getRolePermissions = () => API.get('/roles');

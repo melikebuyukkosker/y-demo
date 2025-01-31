@@ -34,23 +34,26 @@ const App = () => {
         <Route
           path="/users"
           element={
-            <AppLayout>
-              <ProtectedRoute>
+            <ProtectedRoute>
+              <AppLayout>
                 <UsersPage />
-              </ProtectedRoute>
-            </AppLayout>
+              </AppLayout>
+            </ProtectedRoute>
+
           }
         />
-         <Route
-                    path="/profile"
-                    element={
-                        <AppLayout>
-                            <ProtectedRoute>
-                                <ProfilePage />
-                            </ProtectedRoute>
-                        </AppLayout>
-                    }
-                />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+
+              <AppLayout>
+                <ProfilePage />
+              </AppLayout>
+            </ProtectedRoute>
+
+          }
+        />
       </Routes>
     </Router>
   );

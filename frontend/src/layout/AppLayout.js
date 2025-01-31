@@ -14,13 +14,6 @@ const AppLayout = ({ children }) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    // Token kontrolü: Eğer token yoksa login sayfasına yönlendir
-    useEffect(() => {
-        if (!token) {
-            navigate('/login'); // Login sayfasına yönlendir
-        }
-    }, [token, navigate]);
-
     // Kullanıcı menü seçenekleri
     const userMenu = (
         <Menu>

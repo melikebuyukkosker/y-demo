@@ -8,15 +8,15 @@ const EditUser = ({ user, fetchUsers }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [form] = Form.useForm();
-    const [permissions, setPermissions] = useState([]); // Tüm izinler
-    const [selectedPermissions, setSelectedPermissions] = useState([]); // Seçilen izinler
+    const [roles	, setRoles] = useState([]); // Tüm izinler
+    const [selectedRoles, setSelectedRoles] = useState([]); // Seçilen izinler
 
     // Modal'ı aç ve formu doldur
     const showModal = () => {
         setIsModalVisible(true);
         if (user) {
             form.setFieldsValue(user); // Formu kullanıcı bilgileriyle doldur
-            setSelectedPermissions(user.permissions || []); // Kullanıcının mevcut izinlerini seçili hale getir
+            setSelectedRoles(user.roles || []); // Kullanıcının mevcut izinlerini seçili hale getir
         }
     };
 
@@ -24,28 +24,28 @@ const EditUser = ({ user, fetchUsers }) => {
     const handleCancel = () => {
         setIsModalVisible(false);
         form.resetFields();
-        setSelectedPermissions([]); // Seçimleri sıfırla
+        setSelectedRoles([]); // Seçimleri sıfırla
     };
 
     // Tüm izinleri API'den çek
     useEffect(() => {
-        const fetchPermissions = async () => {
+        const fetchRoles = async () => {
             try {
                 const response = await getRolePermissions();
-                setPermissions(response.data.map((perm) => ({
-                    key: perm.permission_id,
-                    title: perm.permission_id,
+                setRoles(response.data.map((perm) => ({
+                    key: perm.role_id,
+                    title: perm.role_id,
                 })));
             } catch (error) {
                 message.error('İzin bilgileri alınırken bir hata oluştu.');
             }
         };
-        fetchPermissions();
+        fetchRoles();
     }, []);
 
     // Transfer bileşeni seçimini yönet
     const handleTransferChange = (targetKeys) => {
-        setSelectedPermissions(targetKeys);
+        setSelectedRoles(targetKeys);
     };
 
     // Kullanıcı düzenleme işlemi
@@ -54,7 +54,7 @@ const EditUser = ({ user, fetchUsers }) => {
         try {
             const updatedUser = {
                 ...values,
-                permissions: selectedPermissions, // Seçilen izinleri güncelleme isteğine ekle
+                roles: selectedRoles.filter(permission => typeof permission === 'string' && permission), // Sadece geçerli string değerleri ekle
             };
             const response = await updateUser(user.user_id, updatedUser); // API çağrısı
             message.success(response.data.message || 'Kullanıcı başarıyla güncellendi!');
@@ -127,16 +127,16 @@ const EditUser = ({ user, fetchUsers }) => {
                     >
                         <Input />
                     </Form.Item>
-
                     <Form.Item label="İzinler">
                         <Transfer
                          listStyle={{
                             width: 360,
                             height: 300,
                           }}
-                            dataSource={permissions}
+                            dataSource={roles}
                             titles={['Mevcut İzinler', 'Seçilen İzinler']}
-                            targetKeys={selectedPermissions}
+                            targetKeys={selectedRoles}
+                            
                             onChange={handleTransferChange}
                             render={(item) => item.title}
                             rowKey={(record) => record.key} // Unique key tanımlama

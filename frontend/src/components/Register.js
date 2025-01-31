@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Typography, message } from 'antd';
+import { Form, Input, Button, Typography, message, Card } from 'antd';
 import { useNavigate } from 'react-router-dom'; // Navigasyon için
 import { registerUser } from '../services/api'; // Register API çağrısı
 
@@ -32,7 +32,7 @@ const Register = () => {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '0 auto', padding: '20px', textAlign: 'center' }}>
+    <Card style={{ width: '400px', margin: '0 auto', padding: '20px', textAlign: 'center' }}>
       <Title level={2}>Register</Title>
       <Form
         layout="vertical"
@@ -87,7 +87,7 @@ const Register = () => {
           </Button>
         </Form.Item>
       </Form>
-    </div>
+    </Card>
   );
 };
 

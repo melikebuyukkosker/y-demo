@@ -91,17 +91,27 @@ app.post('/register', async (req, res, next) => {
 
         const userId = userResult.rows[0].user_id;
 
-        // Kullanıcıya USER_ACCOUNT_READ_PAGE iznini ata
-        const assignPermissionQuery = `
-            INSERT INTO role_permissions (role_id, permission_id) 
-            SELECT ur.role_id, 'USER_ACCOUNT_READ_PAGE'
-            FROM user_roles ur
-            WHERE ur.user_id = $1;
+        // Kullanıcıya varsayılan rol ata (Eğer user_roles tablosunda otomatik eklenmiyorsa)
+        const defaultRoleId = 'USER'; // Varsayılan rol ID'sini belirleyin
+        const insertRoleQuery = `
+            INSERT INTO user_roles (user_id, role_id) 
+            VALUES ($1, $2);
         `;
-        await pool.query(assignPermissionQuery, [userId]);
+        await pool.query(insertRoleQuery, [userId, defaultRoleId]);
+
+        // Kullanıcıya USER_ACCOUNT_READ_PAGE iznini ata
+        // const assignPermissionQuery = `
+        //     INSERT INTO role_permissions (role_id, permission_id) 
+        //     SELECT ur.role_id, 'USER_ACCOUNT_READ_PAGE'
+        //     FROM user_roles ur
+        //     WHERE ur.user_id = $1;
+        // `;
+        // await pool.query(assignPermissionQuery, [userId]);
 
         res.status(201).json({ message: 'User registered successfully with default permissions' });
     } catch (err) {
+        console.error('Error during registration:', err.message);
+
         if (err.code === '23505') {
             next({ statusCode: 400, message: 'Email or unique field already exists' });
         } else {
@@ -177,6 +187,11 @@ app.post('/login', async (req, res, next) => {
             [user.user_id]
         );
 
+        const roles = await pool.query(
+            `SELECT user_role_id, user_id, role_id, created_at, updated_at
+            FROM public.user_roles where user_id=$1`
+        ,[user.user_id])
+
         const permissions = permissionsResult.rows.map((row) => row.permission_id);
 
         // Token oluştur
@@ -198,6 +213,7 @@ app.post('/login', async (req, res, next) => {
                 status: user.status,
                 created_at: user.created_at,
                 updated_at: user.updated_at,
+                roles:roles.rows.map((c)=>c.role_id),
                 permissions,
             },
         });
@@ -206,7 +222,6 @@ app.post('/login', async (req, res, next) => {
         next({ statusCode: 500, message: 'Server Error' });
     }
 });
-
 
 // Kullanıcı Listeleme
 app.get('/users', checkPermission('USER_ACCOUNT_READ_PAGE'), async (req, res, next) => {
@@ -227,6 +242,21 @@ app.get('/users', checkPermission('USER_ACCOUNT_READ_PAGE'), async (req, res, ne
         `;
 
         const result = await pool.query(query);
+
+        for(const user of result.rows){
+            const roles = await pool.query(
+                `SELECT user_role_id, user_id, role_id, created_at, updated_at
+                FROM public.user_roles where user_id=$1`
+            ,[user.user_id])
+
+            const rolDetail = roles.rows.map((c)=>c.role_id);
+
+            user.roles = rolDetail
+    
+        }
+
+
+
         res.status(200).json(result.rows);
     } catch (err) {
         console.error('Error fetching users:', err);
@@ -237,85 +267,68 @@ app.get('/users', checkPermission('USER_ACCOUNT_READ_PAGE'), async (req, res, ne
 // Kullanıcı Düzenleme
 app.patch('/users/:id', checkPermission('USER_ACCOUNT_UPDATE_PAGE'), async (req, res, next) => {
     const { id } = req.params; // Kullanıcı ID'si
-    const { firstname, lastname, email, coordinate, permissions } = req.body; // Güncelleme verileri
+    const { roles } = req.body; // Yeni izinler
+
+    console.log(req.body)
+
+    if (!roles || !Array.isArray(roles)) {
+        return res.status(400).json({ message: 'Roles must be a valid array' });
+    }
+
 
     try {
-        // Kullanıcı bilgilerini güncelle
-        const updateUserQuery = `
-            UPDATE users 
-            SET firstname = $1, lastname = $2, email = $3, coordinate = $4, updated_at = NOW()
-            WHERE user_id = $5
-            RETURNING *;
-        `;
 
-        const userResult = await pool.query(updateUserQuery, [
-            firstname,
-            lastname,
-            email,
-            coordinate,
-            id,
-        ]);
 
-        // Kullanıcı bulunamadıysa
-        if (userResult.rowCount === 0) {
-            return res.status(404).json({ message: 'Kullanıcı bulunamadı!' });
+
+        await pool.query('DELETE FROM user_roles WHERE user_id=$1',[id])
+        for(const role of roles){
+            await pool.query(`
+            INSERT INTO public.user_roles(
+                user_id, role_id)
+                VALUES ($1, $2);
+            `,[id,role])
         }
 
-        // İzinleri güncelleme (Eğer izinler gönderildiyse)
-        if (permissions && Array.isArray(permissions) && permissions.length > 0) {
-            const validPermissions = permissions.filter(permission => permission !== null && typeof permission === 'string');
 
-            // Önce eski izinleri sil
-            const deleteOldPermissionsQuery = `
-                DELETE FROM role_permissions
-                WHERE role_id IN (
-                    SELECT role_id FROM user_roles WHERE user_id = $1
-                );
-            `;
-            await pool.query(deleteOldPermissionsQuery, [id]);
+        // // Mevcut izinleri sil
+        // const deletePermissionsQuery = `
+        //     DELETE FROM role_permissions
+        //     WHERE role_id = ANY($1::VARCHAR[]);
+        // `;
+        // await pool.query(deletePermissionsQuery, [roles]);
 
-            // Yeni izinleri ekle
-            const insertNewPermissionsQuery = `
-                INSERT INTO role_permissions (role_id, permission_id)
-                SELECT ur.role_id, $1
-                FROM user_roles ur
-                WHERE ur.user_id = $2;
-            `;
-            for (const permission of validPermissions) {
-                await pool.query(insertNewPermissionsQuery, [permission, id]);
-            }
-        }
+        // // Yeni izinleri ekle
+        // const insertPermissionsQuery = `
+        //     INSERT INTO role_permissions (role_id, permission_id, created_at, updated_at)
+        //     VALUES ($1, $2, NOW(), NOW());
+        // `;
+        // for (const roleId of roles) {
+        //     for (const permission of permissions) {
+        //         await pool.query(insertPermissionsQuery, [roleId, permission]);
+        //     }
+        // }
 
-        // Güncellenmiş izinleri getir
-        const getUpdatedPermissionsQuery = `
-            SELECT DISTINCT p.permission_id
-            FROM role_permissions rp
-            INNER JOIN permissions p ON rp.permission_id = p.permission_id
-            INNER JOIN user_roles ur ON rp.role_id = ur.role_id
-            WHERE ur.user_id = $1;
-        `;
-        const permissionsResult = await pool.query(getUpdatedPermissionsQuery, [id]);
-        const updatedPermissions = permissionsResult.rows.map(row => row.permission_id);
+        // // Güncellenmiş izinleri döndür
+        // const updatedPermissionsQuery = `
+        //     SELECT DISTINCT p.permission_id
+        //     FROM role_permissions rp
+        //     JOIN permissions p ON rp.permission_id = p.permission_id
+        //     WHERE rp.role_id = ANY($1::VARCHAR[]);
+        // `;
+        // const updatedPermissionsResult = await pool.query(updatedPermissionsQuery, [roles]);
 
-        // Başarılı yanıt
         res.status(200).json({
-            message: 'Kullanıcı ve izinler başarıyla güncellendi!',
-            user: {
-                ...userResult.rows[0],
-                permissions: updatedPermissions,
-            },
+            message: 'Permissions updated successfully',
+            roles: roles,
         });
     } catch (err) {
-        console.error('Hata Detayı:', err);
-
-        // Hata yönetimi
-        if (err.code === '23505') {
-            next({ statusCode: 400, message: 'Bu email adresi zaten başka bir kullanıcı tarafından kullanılıyor!' });
-        } else {
-            next({ statusCode: 500, message: 'Sunucu hatası', error: err.message });
-        }
+        console.error('Error updating permissions:', err.message);
+        next({ statusCode: 500, message: 'Server Error' });
     }
 });
+
+
+
 
 
 
