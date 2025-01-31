@@ -8,29 +8,29 @@ const AddUser = ({ fetchUsers }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [form] = Form.useForm();
-    const [permissions, setPermissions] = useState([]); // Tüm izinler
-    const [selectedPermissions, setSelectedPermissions] = useState([]); // Seçilen izinler
+    const [roles, setRoles] = useState([]); // Tüm izinler
+    const [selectedRoles, setSelectedRoles] = useState([]); // Seçilen izinler
 
     // Modal'ı aç
     const showModal = () => {
         setIsModalVisible(true);
-        fetchPermissions();
+        fetchRoles();
     };
 
     // Modal'ı kapat
     const handleCancel = () => {
         setIsModalVisible(false);
         form.resetFields();
-        setSelectedPermissions([]); // Seçimleri sıfırla
+        setSelectedRoles([]); // Seçimleri sıfırla
     };
 
     // Tüm izinleri API'den çek
-    const fetchPermissions = async () => {
+    const fetchRoles = async () => {
         try {
             const response = await getRolePermissions();
-            setPermissions(response.data.map((perm) => ({
-                key: perm.permission_id,
-                title: perm.permission_id,
+            setRoles(response.data.map((perm) => ({
+                key: perm.role_id,
+                title: perm.role_id,
             })));
         } catch (error) {
             message.error('İzin bilgileri alınırken bir hata oluştu.');
@@ -40,7 +40,7 @@ const AddUser = ({ fetchUsers }) => {
 
     // Transfer bileşeni seçimini yönet
     const handleTransferChange = (targetKeys) => {
-        setSelectedPermissions(targetKeys);
+        setSelectedRoles(targetKeys);
     };
 
     // Kullanıcı ekleme işlemi
@@ -49,7 +49,7 @@ const AddUser = ({ fetchUsers }) => {
         try {
             const newUser = {
                 ...values,
-                permissions: selectedPermissions, // Seçilen izinleri API isteğine ekle
+                roles: selectedRoles, // Seçilen izinleri API isteğine ekle
             };
             const response = await registerUser(newUser); // API fonksiyonunu çağır
             message.success(response.data.message);
@@ -109,7 +109,6 @@ const AddUser = ({ fetchUsers }) => {
                     >
                         <Input />
                     </Form.Item>
-
                     <Form.Item
                         label="Şifre"
                         name="password"
@@ -131,9 +130,9 @@ const AddUser = ({ fetchUsers }) => {
                             width: 360,
                             height: 300,
                           }}
-                            dataSource={permissions}
+                            dataSource={roles}
                             titles={['Mevcut İzinler', 'Seçilen İzinler']}
-                            targetKeys={selectedPermissions}
+                            targetKeys={selectedRoles}
                             onChange={handleTransferChange}
                             render={(item) => item.title}
                             rowKey={(record) => record.key} // Unique key tanımlama
